@@ -1,4 +1,4 @@
--- Oblig2, Oliver
+-- Oblig 2, Oliver
 
 import System.IO
 import Data.Char
@@ -6,7 +6,7 @@ import Data.Char
 -- Game data structure
 type Pillar = [Int]
 type Tower = [Pillar]
-data OP = Rem | Add | Keep
+data Op = Rem | Add | Keep
 
 -- Auxiliary functions
 ring n = take (2*n - 1) (concat (repeat "# "))
@@ -35,6 +35,23 @@ topp (x:xs) = if x > 0 then x else topp xs
 -- Creates a new tower with n rings
 newTower :: Int -> Tower
 newTower n = [take (n+1) [0..],take (n+1) (repeat 0),take (n+1) (repeat 0)] :: Tower
+
+reverseMoves :: Tower -> [(Int,Int)] -> Int -> IO (Tower,[(Int,Int)])
+reverseMoves tower moves n = do
+    let startTower = newTower (length (tower !! 0) - 1)
+    if n >= length moves then
+        return (startTower,[]) :: IO (Tower,[(Int,Int)])
+    else do
+        let newMoves = take (length moves - n) moves
+        newTower <- applyMoves startTower newMoves
+        return (newTower,newMoves) :: IO (Tower,[(Int,Int)])
+
+applyMoves :: Tower -> [(Int,Int)] -> IO Tower
+applyMoves tower [] = return tower :: IO Tower
+applyMoves tower (x:xs) = do
+    tempTower <- updateTower tower x
+    t <- applyMoves tempTower xs
+    return t :: IO Tower
 
 -- Returns the maximum width of a tower
 maxWidth :: Tower -> IO Int
@@ -72,7 +89,7 @@ updateTower tower (a,b) = do
         return [[update r h t ring (if a == 0 then Rem else if b == 0 then Add else Keep) | (r,t,h) <- zip3 (tower !! 0) (tail (tower !! 0) ++ [-1]) ([0] ++ init (tower !! 0))], [update r h t ring (if a == 1 then Rem else if b == 1 then Add else Keep) | (r,t,h) <- zip3 (tower !! 1) (tail (tower !! 1) ++ [-1]) ([0] ++ init (tower !! 1))], [update r h t ring (if a == 2 then Rem else if b == 2 then Add else Keep) | (r,t,h) <- zip3 (tower !! 2) (tail (tower !! 2) ++ [-1]) ([0] ++ init (tower !! 2))]] :: IO Tower
 
 -- Updates a ring from a pillar according to the given operator
-update :: Int -> Int -> Int -> Int -> OP -> Int
+update :: Int -> Int -> Int -> Int -> Op -> Int
 update r _ _ _ Keep = r
 update r _ t ring Add = if r == 0 && (t > 0 || t == -1) then ring else r
 update r h t _ Rem = if r > 0 && h == 0 then 0 else if r == 0 && t == -1 then -1 else r
@@ -119,7 +136,7 @@ main = do
 
 -- Controls the game
 hanoi :: Tower -> [(Int,Int)] -> String -> IO ()
-hanoi tower moves error = do
+hanoi tower moves prompt = do
     clr
     putTower tower
     newline
@@ -130,44 +147,42 @@ hanoi tower moves error = do
         getChar
         main
     else do
-        putStrLn ("Number of moves: " ++ show (length moves) ++ "   " ++ error) 
+        putStrLn ("Number of moves: " ++ show (length moves) ++ "   " ++ prompt) 
+        putStrLn "Commands: q - quit, <from pillar> <to pillar> - move"
+        putStrLn "z <num moves> - regret moves, h - suggest next move"
         line <- getLine
-        let com1 = head (words line)
-            com2 = head (tail (words line))
-        if com1 == "q" then do
-            clr
-            writeAt 1 1 "Quit game"
-            newline
-        else if not (null com1) && all isDigit com1 then do
-            let p1 = read com1
-            if p1 > 0 && p1 < 4 then do
-                if not (null com2) && all isDigit com2 then do
-                    let p2 = read com2
-                        move = (p1-1,p2-1)
-                    newTower <- updateTower tower move
-                    if valid newTower then
-                        hanoi newTower (moves ++ [move]) ""
-                    else
-                        hanoi tower moves "ERROR: Invalid move"
-                else do
-                    hanoi tower moves "ERROR: Second must be a pillar between 1-3"
-            else do
-                hanoi tower moves "ERROR: First number must be a pillar between 1-3"
-        else if com1 == "z" then do
-            if not (null com2) && all isDigit com2 then do
-                let x = read com2
-                if x >= length moves then do
-                    main
-                else do
-                    return () -- TODO
-            else do
-                hanoi tower moves "ERROR: Not a valid number, z <number of moves>"
-        else if com1 == "h" then do
-            hanoi tower moves "h" -- TODO
+        if null line then
+            hanoi tower moves "ERROR: No command given"
         else do
-            hanoi tower moves "Error: Not a valid command"
-
-
-
-
-    
+            let com1 = head (words line)
+                com2 = head (tail (words line))
+            if com1 == "q" then do
+                clr
+                writeAt 1 1 "Quit game"
+                newline
+            else if not (null com1) && all isDigit com1 then do
+                let p1 = read com1
+                if p1 > 0 && p1 < 4 then do
+                    if not (null com2) && all isDigit com2 then do
+                        let p2 = read com2
+                            move = (p1-1,p2-1)
+                        newTower <- updateTower tower move
+                        if valid newTower then
+                            hanoi newTower (moves ++ [move]) ""
+                        else
+                            hanoi tower moves "ERROR: Invalid move"
+                    else do
+                        hanoi tower moves "ERROR: Second must be a pillar between 1-3"
+                else do
+                    hanoi tower moves "ERROR: First number must be a pillar between 1-3"
+            else if com1 == "z" then do
+                if not (null com2) && all isDigit com2 then do
+                    let n = read com2
+                    (newTower,newMoves) <- reverseMoves tower moves n
+                    hanoi newTower newMoves ""
+                else do
+                    hanoi tower moves "ERROR: Not a valid number, z <number of moves>"
+            else if com1 == "h" then do
+                hanoi tower moves "h" -- TODO
+            else do
+                hanoi tower moves "Error: Not a valid command"
