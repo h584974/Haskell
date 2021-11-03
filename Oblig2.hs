@@ -105,9 +105,15 @@ updateTower tower (a,b) = do
     else do
         let ring = top (tower !! a)
         -- This may be more complicated than it had to be...
-        -- For each pillar in the tower it zips the pillar, the tail of the pillar + -1 to use for checking, and 0 + the inital array of the tower
+        -- For each pillar in the tower it zips the pillar, the tail of the pillar + (-1) to use for checking, and 0 + the inital array of the tower
         -- Then on each element of the pillar it uses the function update to update the value according to the operators Add, Rem and Keep
         return [[update r h t ring (if a == 0 then Rem else if b == 0 then Add else Keep) | (r,t,h) <- zip3 (tower !! 0) (tail (tower !! 0) ++ [-1]) ([0] ++ init (tower !! 0))], [update r h t ring (if a == 1 then Rem else if b == 1 then Add else Keep) | (r,t,h) <- zip3 (tower !! 1) (tail (tower !! 1) ++ [-1]) ([0] ++ init (tower !! 1))], [update r h t ring (if a == 2 then Rem else if b == 2 then Add else Keep) | (r,t,h) <- zip3 (tower !! 2) (tail (tower !! 2) ++ [-1]) ([0] ++ init (tower !! 2))]] :: IO Tower
+
+-- Updates a ring from a pillar according to the given operator
+update :: Int -> Int -> Int -> Int -> Op -> Int
+update r _ _ _ Keep = r
+update r _ t ring Add = if r == 0 && (t > 0 || t == -1) then ring else r
+update r h t _ Rem = if r > 0 && h == 0 then 0 else if r == 0 && t == -1 then -1 else r
 
 -- Writes tower on screen
 putTower :: Tower -> IO ()
@@ -167,12 +173,6 @@ solve tower moves towers n = do
                 return []
             else 
                 return (shortest validSolutions)
-
--- Updates a ring from a pillar according to the given operator
-update :: Int -> Int -> Int -> Int -> Op -> Int
-update r _ _ _ Keep = r
-update r _ t ring Add = if r == 0 && (t > 0 || t == -1) then ring else r
-update r h t _ Rem = if r > 0 && h == 0 then 0 else if r == 0 && t == -1 then -1 else r
 
 -- Starts the program and shows the start menu
 main :: IO ()
