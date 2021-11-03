@@ -9,8 +9,11 @@ type Tower = [Pillar]
 data Op = Rem | Add | Keep
 
 -- Auxiliary functions
+
+-- Creates a Stirng with n-numbers of "# " in sequence
 ring n = take (2*n - 1) (concat (repeat "# "))
 
+-- Finds the maximum width of a pillar, which is the length of it's largest ring
 width pillar = (pillar !! (length pillar - 1)) * 2
 
 clr = putStr "\ESC[2J"
@@ -23,35 +26,50 @@ writeAt x y str = do
     goto x y
     putStr str
 
+-- Writes a String with it's center at the given x value as opposed to from x
 centerWrite x y str = writeAt (x - ((length str) `div` 2)) y str
 
+-- Createst a String-representation of a ring with length r, if r = 0 then | is drawn instead
 ringStr r = if r == 0 then "|" else ring r
 
-topp [] = 0
-topp (x:xs) = if x > 0 then x else topp xs
+-- Finds the top ring of a pillar
+top [] = 0
+top (x:xs) = if x > 0 then x else top xs
+
+-- Checks if an element exists in a list
+exists _ [] = False
+exists a (x:xs) = if a == x then True else exists a xs
+
+-- Finds the shortest list in a list of lists
+shortest list = shortest' list (head list) (length (head list))
+shortest' [] l _ = l
+shortest' (x:xs) l len = if (length x) < len then shortest' xs x (length x) else shortest' xs l len
 
 -- Primary functions
 
 -- Creates a new tower with n rings
 newTower :: Int -> Tower
-newTower n = [take (n+1) [0..],take (n+1) (repeat 0),take (n+1) (repeat 0)] :: Tower
+newTower n = [take (n+1) [0..],take (n+1) (repeat 0),take (n+1) (repeat 0)]
 
+-- Reverses a given number of moves on a tower, returns the new state of
+-- the tower and the list of moves applied up until that state
 reverseMoves :: Tower -> [(Int,Int)] -> Int -> IO (Tower,[(Int,Int)])
 reverseMoves tower moves n = do
     let startTower = newTower (length (tower !! 0) - 1)
     if n >= length moves then
-        return (startTower,[]) :: IO (Tower,[(Int,Int)])
+        return (startTower,[])
     else do
         let newMoves = take (length moves - n) moves
         newTower <- applyMoves startTower newMoves
-        return (newTower,newMoves) :: IO (Tower,[(Int,Int)])
+        return (newTower,newMoves)
 
+-- Recursively applies all moves from a list of moves to a tower
 applyMoves :: Tower -> [(Int,Int)] -> IO Tower
-applyMoves tower [] = return tower :: IO Tower
+applyMoves tower [] = return tower
 applyMoves tower (x:xs) = do
     tempTower <- updateTower tower x
     t <- applyMoves tempTower xs
-    return t :: IO Tower
+    return t
 
 -- Returns the maximum width of a tower
 maxWidth :: Tower -> IO Int
@@ -83,16 +101,10 @@ validPillar (x:y:ys) = x <= y && x >= 0 && validPillar (y:ys)
 updateTower :: Tower -> (Int,Int) -> IO Tower
 updateTower tower (a,b) = do
     if a == b then
-        return [[-1],[-1],[-1]] :: IO Tower
+        return [[-1],[-1],[-1]]
     else do
-        let ring = topp (tower !! a)
+        let ring = top (tower !! a)
         return [[update r h t ring (if a == 0 then Rem else if b == 0 then Add else Keep) | (r,t,h) <- zip3 (tower !! 0) (tail (tower !! 0) ++ [-1]) ([0] ++ init (tower !! 0))], [update r h t ring (if a == 1 then Rem else if b == 1 then Add else Keep) | (r,t,h) <- zip3 (tower !! 1) (tail (tower !! 1) ++ [-1]) ([0] ++ init (tower !! 1))], [update r h t ring (if a == 2 then Rem else if b == 2 then Add else Keep) | (r,t,h) <- zip3 (tower !! 2) (tail (tower !! 2) ++ [-1]) ([0] ++ init (tower !! 2))]] :: IO Tower
-
--- Updates a ring from a pillar according to the given operator
-update :: Int -> Int -> Int -> Int -> Op -> Int
-update r _ _ _ Keep = r
-update r _ t ring Add = if r == 0 && (t > 0 || t == -1) then ring else r
-update r h t _ Rem = if r > 0 && h == 0 then 0 else if r == 0 && t == -1 then -1 else r
 
 -- Writes tower on screen
 putTower :: Tower -> IO ()
@@ -113,7 +125,53 @@ putTower' [(x:xs),(a:as),(z:zs)] y w = do
     centerWrite x3 y (ringStr z)
     putTower' [xs,as,zs] (y+1) w
 
--- Starts program
+-- Returns the optimal next move to make
+bestMove :: Tower -> IO (Int,Int)
+bestMove tower = do
+    moves <- solve tower [] [] 0
+    return (head moves)
+
+-- Recursively solves a given tower from it's current layout in all different possible ways, 
+-- and returns the solution with the least nummber of moves. Seems to work, but is hopelessly slow
+-- for towers with more than 3 rings
+solve :: Tower -> [(Int,Int)] -> [Tower] -> Int -> IO [(Int,Int)]
+solve tower moves towers n = do
+    if finished tower then
+        return moves
+    else do
+        let m1 = (0,1)
+            m2 = (0,2)
+            m3 = (1,0)
+            m4 = (1,2)
+            m5 = (2,0)
+            m6 = (2,1)
+        t1 <- updateTower tower m1
+        t2 <- updateTower tower m2
+        t3 <- updateTower tower m3
+        t4 <- updateTower tower m4
+        t5 <- updateTower tower m5
+        t6 <- updateTower tower m6
+        let ts = [t1,t2,t3,t4,t5,t6]
+            ms = [m1,m2,m3,m4,m5,m6]
+            towersMoves = zip ts ms
+            validTowersMoves = [(t,m) | (t,m) <- towersMoves, valid t, not (exists t towers)]
+        if null validTowersMoves then
+            return []
+        else do
+            solutions <- mapM (\(t,m) -> solve t (moves ++ [m]) (towers ++ [tower]) (n+1)) validTowersMoves
+            let validSolutions = [s | s <- solutions, not (null s)]
+            if null validSolutions then
+                return []
+            else 
+                return (shortest validSolutions)
+
+-- Updates a ring from a pillar according to the given operator
+update :: Int -> Int -> Int -> Int -> Op -> Int
+update r _ _ _ Keep = r
+update r _ t ring Add = if r == 0 && (t > 0 || t == -1) then ring else r
+update r h t _ Rem = if r > 0 && h == 0 then 0 else if r == 0 && t == -1 then -1 else r
+
+-- Starts the program and shows the start menu
 main :: IO ()
 main = do
     putStrLn "Start a new game with b <Number of rings>, or quit with q"
@@ -149,7 +207,7 @@ hanoi tower moves prompt = do
     else do
         putStrLn ("Number of moves: " ++ show (length moves) ++ "   " ++ prompt) 
         putStrLn "Commands: q - quit, <from pillar> <to pillar> - move"
-        putStrLn "z <num moves> - regret moves, h - suggest next move"
+        putStrLn "z <num moves> - regret moves, h - Show next optimal move"
         line <- getLine
         if null line then
             hanoi tower moves "ERROR: No command given"
@@ -183,6 +241,7 @@ hanoi tower moves prompt = do
                 else do
                     hanoi tower moves "ERROR: Not a valid number, z <number of moves>"
             else if com1 == "h" then do
-                hanoi tower moves "h" -- TODO
+                (a,b) <- bestMove tower
+                hanoi tower moves ("Optimal move: (" ++ show (a+1) ++ "," ++ show (b+1) ++ ")")
             else do
                 hanoi tower moves "Error: Not a valid command"
