@@ -137,42 +137,28 @@ putTower' [(x:xs),(a:as),(z:zs)] y w = do
 -- Returns the optimal next move to make
 bestMove :: Tower -> IO (Int,Int)
 bestMove tower = do
-    moves <- solve tower [] [] 0
-    return (head moves)
+    bestMoves <- solve tower [] []
+    return (head bestMoves)
 
 -- Recursively solves a given tower from it's current layout in all different possible ways, 
--- and returns the solution with the least nummber of moves. Seems to work, but is hopelessly slow
--- for towers with more than 3 rings
-solve :: Tower -> [(Int,Int)] -> [Tower] -> Int -> IO [(Int,Int)]
-solve tower moves towers n = do
+-- and returns the solution with the least nummber of moves. Seems to work, but is
+-- hopelessly slow for any towers with > 3 rings
+solve :: Tower -> [(Int,Int)] -> [Tower] -> IO [(Int,Int)]
+solve tower moves towers = do
     if finished tower then
         return moves
     else do
-        let m1 = (0,1)
-            m2 = (0,2)
-            m3 = (1,0)
-            m4 = (1,2)
-            m5 = (2,0)
-            m6 = (2,1)
-        t1 <- updateTower tower m1
-        t2 <- updateTower tower m2
-        t3 <- updateTower tower m3
-        t4 <- updateTower tower m4
-        t5 <- updateTower tower m5
-        t6 <- updateTower tower m6
-        let ts = [t1,t2,t3,t4,t5,t6]
-            ms = [m1,m2,m3,m4,m5,m6]
-            towersMoves = zip ts ms
+        let prevMove = (if null moves then (-1,-1) else last moves)
+            ms =[(a,b) | (a,b) <- [(0,1),(0,2),(1,0),(1,2),(2,0),(2,1)], not (a == snd prevMove)]
+        ts <- mapM (\m -> updateTower tower m) ms
+        let towersMoves = zip ts ms
             validTowersMoves = [(t,m) | (t,m) <- towersMoves, valid t, not (exists t towers)]
-        if null validTowersMoves then
+        solutions <- mapM (\(t,m) -> solve t (moves ++ [m]) (towers ++ [tower])) validTowersMoves
+        let validSolutions = [s | s <- solutions, not (null s)]
+        if null validSolutions then
             return []
-        else do
-            solutions <- mapM (\(t,m) -> solve t (moves ++ [m]) (towers ++ [tower]) (n+1)) validTowersMoves
-            let validSolutions = [s | s <- solutions, not (null s)]
-            if null validSolutions then
-                return []
-            else 
-                return (shortest validSolutions)
+        else 
+            return (shortest validSolutions)
 
 -- Starts the program and shows the start menu
 main :: IO ()
