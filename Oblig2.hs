@@ -104,6 +104,9 @@ updateTower tower (a,b) = do
         return [[-1],[-1],[-1]]
     else do
         let ring = top (tower !! a)
+        -- This may be more complicated than it had to be...
+        -- For each pillar in the tower it zips the pillar, the tail of the pillar + -1 to use for checking, and 0 + the inital array of the tower
+        -- Then on each element of the pillar it uses the function update to update the value according to the operators Add, Rem and Keep
         return [[update r h t ring (if a == 0 then Rem else if b == 0 then Add else Keep) | (r,t,h) <- zip3 (tower !! 0) (tail (tower !! 0) ++ [-1]) ([0] ++ init (tower !! 0))], [update r h t ring (if a == 1 then Rem else if b == 1 then Add else Keep) | (r,t,h) <- zip3 (tower !! 1) (tail (tower !! 1) ++ [-1]) ([0] ++ init (tower !! 1))], [update r h t ring (if a == 2 then Rem else if b == 2 then Add else Keep) | (r,t,h) <- zip3 (tower !! 2) (tail (tower !! 2) ++ [-1]) ([0] ++ init (tower !! 2))]] :: IO Tower
 
 -- Writes tower on screen
