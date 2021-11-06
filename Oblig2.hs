@@ -234,3 +234,31 @@ hanoi tower moves prompt = do
                 hanoi tower moves ("Optimal move: (" ++ show (a+1) ++ "," ++ show (b+1) ++ ")")
             else do
                 hanoi tower moves "Error: Not a valid command"
+
+--solve' :: [(Tower,[(Int,Int)])] -> IO [(Tower,[(Int,Int)])]
+--solve' tms = do
+--    let nms = [(0,1),(0,2),(1,0),(1,2),(2,0),(2,1)]
+--        tmsn = [ (t,ms,n) | (t,ms) <- tms, n <- nms, not (fst n == snd (if null ms then (-1,-1) else last ms)) ]    
+--   nts <- mapM (\(t,ms,n) -> update t n) tmsn
+--    let ms = [ms++[n] | (t,ms,n) <- tmsn]
+--       ntms = zip nts ms
+--        vtms = [(t,ms) | (t,ms) <- ntms, valid t, not (towerExists t tms)]
+--    if null vtms then 
+--        return tms
+--    else 
+--        solve' vtms 
+
+--bestMove' :: Tower -> IO (Int,Int)
+--bestMove' tower = do
+--    tms <- solve' [(tower,[])]
+--    let fms = collectFinishedMovesets tms
+--        bestMoveset = shortest fms
+--        nextBestMove = head bestMoveset
+--    return nextBestMove
+
+--towerExists :: Tower -> [(Tower,[(Int,Int)])] -> Bool
+--towerExists _ [] = False
+--towerExists t1 ((t2,ms):xs) = t1 == t2 || towerExists t1 xs
+
+--collectFinishedMovesets :: [(Tower,[(Int,Int)])] -> [[(Int,Int)]]
+--collectFinishedMovesets tms = [ms | (t,ms) <- tms, finished t]

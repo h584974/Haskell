@@ -78,10 +78,7 @@ gRep f y (x:xs) = if f x
                   else y : (gRep f y xs)
 
 gRep' :: (t -> Bool) -> t -> [t] -> [t]
-gRep' f y xs = let bools = map f xs 
-                   zipped = zip xs bools
-               in
-               [if b then x else y | (x,b) <- zipped]
+gRep' f y xs = map (\x -> if f x then x else y) xs
 
 -- B
 putBoard' :: Board -> IO ()
