@@ -98,22 +98,22 @@ validPillar [x] = x >= 0
 validPillar (x:y:ys) = x <= y && x >= 0 && validPillar (y:ys)
 
 -- Updates the tower according to the given move
-updateTower :: Tower -> (Int,Int) -> IO Tower
-updateTower tower (a,b) = do
+updateTower [p1,p2,p3] (a,b) = do
     if a == b then
         return [[-1],[-1],[-1]]
     else do
-        let ring = top (tower !! a)
-        -- This may be more complicated than it had to be...
-        -- For each pillar in the tower it zips the pillar, the tail of the pillar + (-1) to use for checking, and 0 + the inital array of the tower
-        -- Then on each element of the pillar it uses the function update to update the value according to the operators Add, Rem and Keep
-        return [[update r h t ring (if a == 0 then Rem else if b == 0 then Add else Keep) | (r,t,h) <- zip3 (tower !! 0) (tail (tower !! 0) ++ [-1]) ([0] ++ init (tower !! 0))], [update r h t ring (if a == 1 then Rem else if b == 1 then Add else Keep) | (r,t,h) <- zip3 (tower !! 1) (tail (tower !! 1) ++ [-1]) ([0] ++ init (tower !! 1))], [update r h t ring (if a == 2 then Rem else if b == 2 then Add else Keep) | (r,t,h) <- zip3 (tower !! 2) (tail (tower !! 2) ++ [-1]) ([0] ++ init (tower !! 2))]] :: IO Tower
+        let ring = top ([p1,p2,p3] !! a)
+        return [(if a == 0 then removeFrom p1 else if b == 0 then addTo p1 ring else p1),(if a == 1 then removeFrom p2 else if b == 1 then addTo p2 ring else p2),(if a == 2 then removeFrom p3 else if b == 2 then addTo p3 ring else p3)]
 
--- Updates a ring from a pillar according to the given operator
-update :: Int -> Int -> Int -> Int -> Op -> Int
-update r _ _ _ Keep = r
-update r _ t ring Add = if r == 0 && (t > 0 || t == -1) then ring else r
-update r h t _ Rem = if r > 0 && h == 0 then 0 else if r == 0 && t == -1 then -1 else r
+-- Removes the top ring from a given pillar, if the pillar is empty the last ring is ste to -1 to indicate that this is an invalid move
+removeFrom :: Pillar -> Pillar
+removeFrom [x] = if x == 0 then [-1] else [0]
+removeFrom (x:y:ys) = if x == 0 && y > 0 then (x:0:ys) else x:(removeFrom (y:ys))
+
+-- Adds a ring to the given pillar
+addTo :: Pillar -> Int -> Pillar
+addTo [x] ring = [ring]
+addTo (x:y:ys) ring = if x == 0 && y > 0 then ring:(y:ys) else x:(addTo (y:ys) ring)
 
 -- Writes tower on screen
 putTower :: Tower -> IO ()
@@ -134,31 +134,38 @@ putTower' [(x:xs),(a:as),(z:zs)] y w = do
     centerWrite x3 y (ringStr z)
     putTower' [xs,as,zs] (y+1) w
 
--- Returns the optimal next move to make
+-- Greatly improved function for solving towers, can now quickly solve towers with 5 rings.
+-- Still works for 6 rings, but becomes slow from that point.
+solve :: [(Tower,[(Int,Int)])] -> IO [(Tower,[(Int,Int)])]
+solve tms = do
+    let nms = [(0,1),(0,2),(1,0),(1,2),(2,0),(2,1)]
+        tmsn = [ (t,ms,n) | (t,ms) <- tms, n <- nms, not (fst n == snd (if null ms then (-1,-1) else last ms)) ]    
+    nts <- mapM (\(t,ms,n) -> updateTower t n) tmsn
+    let ms = [ms++[n] | (t,ms,n) <- tmsn]
+        ntms = zip nts ms
+        vtms = [(t,ms) | (t,ms) <- ntms, valid t, not (towerExists t tms)]
+    if any (\(t,ms) -> finished t) vtms then
+        return vtms
+    else 
+        solve vtms 
+
+-- Returns the the next optimal move
 bestMove :: Tower -> IO (Int,Int)
 bestMove tower = do
-    bestMoves <- solve tower [] []
-    return (head bestMoves)
+    tms <- solve [(tower,[])]
+    let fms = collectFinishedMovesets tms
+        bestMoveset = shortest fms
+        nextBestMove = head bestMoveset
+    return nextBestMove
 
--- Recursively solves a given tower from it's current layout in all different possible ways, 
--- and returns the solution with the least nummber of moves. Seems to work, but is
--- hopelessly slow for any towers with > 3 rings
-solve :: Tower -> [(Int,Int)] -> [Tower] -> IO [(Int,Int)]
-solve tower moves towers = do
-    if finished tower then
-        return moves
-    else do
-        let prevMove = (if null moves then (-1,-1) else last moves)
-            ms =[(a,b) | (a,b) <- [(0,1),(0,2),(1,0),(1,2),(2,0),(2,1)], not (a == snd prevMove)]
-        ts <- mapM (\m -> updateTower tower m) ms
-        let towersMoves = zip ts ms
-            validTowersMoves = [(t,m) | (t,m) <- towersMoves, valid t, not (exists t towers)]
-        solutions <- mapM (\(t,m) -> solve t (moves ++ [m]) (towers ++ [tower])) validTowersMoves
-        let validSolutions = [s | s <- solutions, not (null s)]
-        if null validSolutions then
-            return []
-        else 
-            return (shortest validSolutions)
+-- Determines if a tower exists in the list of towers and movesets
+towerExists :: Tower -> [(Tower,[(Int,Int)])] -> Bool
+towerExists _ [] = False
+towerExists t1 ((t2,ms):xs) = t1 == t2 || towerExists t1 xs
+
+-- Extracts all the movesets from the list of towers and movesets
+collectFinishedMovesets :: [(Tower,[(Int,Int)])] -> [[(Int,Int)]]
+collectFinishedMovesets tms = [ms | (t,ms) <- tms, finished t]
 
 -- Starts the program and shows the start menu
 main :: IO ()
@@ -234,31 +241,3 @@ hanoi tower moves prompt = do
                 hanoi tower moves ("Optimal move: (" ++ show (a+1) ++ "," ++ show (b+1) ++ ")")
             else do
                 hanoi tower moves "Error: Not a valid command"
-
---solve' :: [(Tower,[(Int,Int)])] -> IO [(Tower,[(Int,Int)])]
---solve' tms = do
---    let nms = [(0,1),(0,2),(1,0),(1,2),(2,0),(2,1)]
---        tmsn = [ (t,ms,n) | (t,ms) <- tms, n <- nms, not (fst n == snd (if null ms then (-1,-1) else last ms)) ]    
---   nts <- mapM (\(t,ms,n) -> update t n) tmsn
---    let ms = [ms++[n] | (t,ms,n) <- tmsn]
---       ntms = zip nts ms
---        vtms = [(t,ms) | (t,ms) <- ntms, valid t, not (towerExists t tms)]
---    if null vtms then 
---        return tms
---    else 
---        solve' vtms 
-
---bestMove' :: Tower -> IO (Int,Int)
---bestMove' tower = do
---    tms <- solve' [(tower,[])]
---    let fms = collectFinishedMovesets tms
---        bestMoveset = shortest fms
---        nextBestMove = head bestMoveset
---    return nextBestMove
-
---towerExists :: Tower -> [(Tower,[(Int,Int)])] -> Bool
---towerExists _ [] = False
---towerExists t1 ((t2,ms):xs) = t1 == t2 || towerExists t1 xs
-
---collectFinishedMovesets :: [(Tower,[(Int,Int)])] -> [[(Int,Int)]]
---collectFinishedMovesets tms = [ms | (t,ms) <- tms, finished t]
