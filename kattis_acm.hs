@@ -1,7 +1,14 @@
 main = do
-    l <- getLine
-    s <- solve . lines $ l
+    ls <- getLines []
+    s <- solve ls
     print s
+
+getLines ls = do
+    l <- getLine
+    if null l then
+        return ls
+    else
+        getLines (ls++[l])
 
 solve :: [String] -> IO String
 solve l = evaluate l 0 [] 0
