@@ -153,10 +153,7 @@ solve tms = do
 bestMove :: Tower -> IO (Int,Int)
 bestMove tower = do
     tms <- solve [(tower,[])]
-    let fms = collectFinishedMovesets tms
-        bestMoveset = shortest fms
-        nextBestMove = head bestMoveset
-    return nextBestMove
+    return ( (head . shortest . collectFinishedMovesets) tms )
 
 -- Determines if a tower exists in the list of towers and movesets
 towerExists :: Tower -> [(Tower,[(Int,Int)])] -> Bool
