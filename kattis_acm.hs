@@ -1,20 +1,21 @@
 main = do
-    ls <- getLines []
-    s <- solve ls
-    print s
+    inputs <- readInputs []
+    s <- solve inputs
+    putStrLn s
 
-getLines ls = do
+readInputs :: [String] -> IO [String]
+readInputs inputs = do
     l <- getLine
-    if null l then
-        return ls
+    if l == "-1" then
+        return inputs
     else
-        getLines (ls++[l])
+        readInputs (inputs++[l])
 
 solve :: [String] -> IO String
 solve l = evaluate l 0 [] 0
 
 evaluate :: [String] -> Int -> [String] -> Int -> IO String
-evaluate [x] numRight _ scoreSum = return (show numRight ++ " " ++ show scoreSum)
+evaluate [] numRight _ scoreSum = return (show numRight ++ " " ++ show scoreSum)
 evaluate (x:xs) numRight wrongSubs scoreSum = do
     let ws = words x
         mins = (read $ ws !! 0) :: Int
